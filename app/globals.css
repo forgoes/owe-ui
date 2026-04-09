@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "SF Pro Display", "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", "Menlo", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
+code {
+  font-family: var(--font-mono);
+}
+
+.markdown-message h1,
+.markdown-message h2,
+.markdown-message h3,
+.markdown-message h4 {
+  margin: 0.75rem 0 0.4rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.markdown-message h1 {
+  font-size: 1.25rem;
+}
+
+.markdown-message h2 {
+  font-size: 1.125rem;
+}
+
+.markdown-message h3,
+.markdown-message h4 {
+  font-size: 1rem;
+}
+
+.markdown-message p {
+  margin: 0.45rem 0;
+}
+
+.markdown-message ul,
+.markdown-message ol {
+  margin: 0.5rem 0;
+  padding-left: 1.35rem;
+}
+
+.markdown-message li {
+  margin: 0.2rem 0;
+}
+
+.markdown-message strong {
+  font-weight: 700;
+}
+
+.markdown-message em {
+  font-style: italic;
+}
+
+.markdown-message a {
+  color: #a7f3d0;
+  text-decoration: underline;
+}
+
+.markdown-message code {
+  border-radius: 0.4rem;
+  background: rgba(15, 23, 42, 0.65);
+  padding: 0.1rem 0.35rem;
+  font-size: 0.9em;
+}
+
+.markdown-message pre {
+  overflow-x: auto;
+  border-radius: 1rem;
+  background: rgba(2, 6, 23, 0.9);
+  padding: 0.9rem 1rem;
+}
+
+.markdown-message pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-message blockquote {
+  margin: 0.7rem 0;
+  border-left: 3px solid rgba(167, 243, 208, 0.35);
+  padding-left: 0.9rem;
+  color: rgba(226, 232, 240, 0.9);
+}
