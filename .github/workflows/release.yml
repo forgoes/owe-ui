@@ -10,6 +10,7 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/owe-ui
   DEVOPS_REPOSITORY: example/owe-devops
   DEVOPS_VALUES_FILE: charts/owe-staging/values.yaml
+  DEVOPS_REPO_TOKEN: ${{ secrets.DEVOPS_REPO_TOKEN }}
 
 jobs:
   release:
@@ -61,7 +62,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Checkout devops repository
-        if: ${{ secrets.DEVOPS_REPO_TOKEN != '' }}
+        if: ${{ env.DEVOPS_REPO_TOKEN != '' }}
         uses: actions/checkout@v4
         with:
           repository: ${{ env.DEVOPS_REPOSITORY }}
@@ -69,7 +70,7 @@ jobs:
           path: devops
 
       - name: Update UI image tag
-        if: ${{ secrets.DEVOPS_REPO_TOKEN != '' }}
+        if: ${{ env.DEVOPS_REPO_TOKEN != '' }}
         env:
           VERSION_TAG: ${{ github.ref_name }}
         run: |
@@ -88,7 +89,7 @@ jobs:
           PY
 
       - name: Commit devops update
-        if: ${{ secrets.DEVOPS_REPO_TOKEN != '' }}
+        if: ${{ env.DEVOPS_REPO_TOKEN != '' }}
         working-directory: devops
         run: |
           git config user.name "github-actions[bot]"
