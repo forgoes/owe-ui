@@ -127,7 +127,7 @@ function bucketTone(bucket: Qualification["bucket"]) {
 }
 
 export default function Page() {
-  const [apiBaseUrl, setApiBaseUrl] = useState("http://localhost:8000");
+  const [apiBaseUrl, setApiBaseUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([initialAssistantMessage]);
   const [input, setInput] = useState("");
@@ -152,16 +152,21 @@ export default function Page() {
         const payload = (await response.json()) as { apiBaseUrl?: string } | undefined;
         if (payload?.apiBaseUrl) {
           setApiBaseUrl(payload.apiBaseUrl);
+          return;
         }
       } catch {
         // Fall back to the local default when runtime config is unavailable.
       }
+
+      setApiBaseUrl("http://localhost:8000");
     }
 
     void loadRuntimeConfig();
   }, []);
 
   useEffect(() => {
+    if (!apiBaseUrl) return;
+
     async function bootstrapSession() {
       const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
       if (raw) {
@@ -234,7 +239,7 @@ export default function Page() {
     event.preventDefault();
 
     const trimmed = input.trim();
-    if (!trimmed || isStreaming || !sessionId) return;
+    if (!trimmed || isStreaming || !sessionId || !apiBaseUrl) return;
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
