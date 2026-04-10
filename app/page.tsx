@@ -73,7 +73,7 @@ type KeyVariable = {
   key: VariableKey;
   label: string;
   getValue: (profile: LeadProfile) => string;
-  isMissing: (state: ConversationState) => boolean;
+  getStatus: (state: ConversationState) => "Captured" | "Missing" | "Not needed";
 };
 
 const SESSION_STORAGE_KEY = "owe-ui-session";
@@ -82,13 +82,15 @@ const KEY_VARIABLES: KeyVariable[] = [
     key: "business_segment",
     label: "Business type",
     getValue: (profile) => labelize(profile.business_segment),
-    isMissing: (state) => state.missing_fields.includes("business_segment"),
+    getStatus: (state) =>
+      state.profile.business_segment !== null ? "Captured" : "Missing",
   },
   {
     key: "contract_status",
     label: "Contract status",
     getValue: (profile) => labelize(profile.contract_status),
-    isMissing: (state) => state.missing_fields.includes("contract_status"),
+    getStatus: (state) =>
+      state.profile.contract_status !== "unknown" ? "Captured" : "Missing",
   },
   {
     key: "contract_expiry_months",
@@ -97,14 +99,22 @@ const KEY_VARIABLES: KeyVariable[] = [
       profile.contract_expiry_months !== null
         ? `${profile.contract_expiry_months} months`
         : "Not captured",
-    isMissing: (state) => state.missing_fields.includes("contract_expiry_months"),
+    getStatus: (state) => {
+      if (state.profile.contract_expiry_months !== null) return "Captured";
+      if (state.missing_fields.includes("contract_expiry_months")) return "Missing";
+      return "Not needed";
+    },
   },
   {
     key: "annual_usage_mwh",
     label: "Annual usage",
     getValue: (profile) =>
       profile.annual_usage_mwh !== null ? `${profile.annual_usage_mwh} MWh` : "Not captured",
-    isMissing: (state) => state.missing_fields.includes("annual_usage_or_square_footage"),
+    getStatus: (state) => {
+      if (state.profile.annual_usage_mwh !== null) return "Captured";
+      if (state.missing_fields.includes("annual_usage_or_square_footage")) return "Missing";
+      return "Not needed";
+    },
   },
   {
     key: "square_footage",
@@ -113,14 +123,27 @@ const KEY_VARIABLES: KeyVariable[] = [
       profile.square_footage !== null
         ? `${profile.square_footage.toLocaleString()} sq ft`
         : "Not captured",
-    isMissing: (state) => state.missing_fields.includes("annual_usage_or_square_footage"),
+    getStatus: (state) => {
+      if (state.profile.square_footage !== null) return "Captured";
+      if (
+        state.missing_fields.includes("annual_usage_or_square_footage") &&
+        state.profile.annual_usage_mwh === null
+      ) {
+        return "Missing";
+      }
+      return "Not needed";
+    },
   },
   {
     key: "building_age_years",
     label: "Building age",
     getValue: (profile) =>
       profile.building_age_years !== null ? `${profile.building_age_years} years` : "Not captured",
-    isMissing: (state) => state.missing_fields.includes("building_age_years"),
+    getStatus: (state) => {
+      if (state.profile.building_age_years !== null) return "Captured";
+      if (state.missing_fields.includes("building_age_years")) return "Missing";
+      return "Not needed";
+    },
   },
   {
     key: "has_current_provider",
@@ -130,9 +153,15 @@ const KEY_VARIABLES: KeyVariable[] = [
       if (profile.has_current_provider === false) return "No";
       return "Not captured";
     },
-    isMissing: (state) => {
-      if (state.profile.contract_status === "no_current_provider") return false;
-      return state.profile.has_current_provider === null && state.profile.contract_status === "unknown";
+    getStatus: (state) => {
+      if (
+        state.profile.has_current_provider !== null ||
+        state.profile.contract_status === "no_current_provider"
+      ) {
+        return "Captured";
+      }
+      if (state.profile.contract_status === "unknown") return "Missing";
+      return "Not needed";
     },
   },
 ];
@@ -203,7 +232,7 @@ function conclusionTone(tier: Qualification["tier"]) {
 }
 
 function missingVariableCount(state: ConversationState) {
-  return KEY_VARIABLES.filter((variable) => variable.isMissing(state)).length;
+  return KEY_VARIABLES.filter((variable) => variable.getStatus(state) === "Missing").length;
 }
 
 function badgeTone(mode: ConversationMode) {
@@ -609,14 +638,17 @@ export default function Page() {
               7 Key Variables
             </p>
             <dl className="mt-4 grid gap-3 text-sm text-slate-300">
-              {KEY_VARIABLES.map((variable) => (
-                <ProfileRow
-                  key={variable.key}
-                  label={variable.label}
-                  status={variable.isMissing(state) ? "Missing" : "Captured"}
-                  value={variable.getValue(state.profile)}
-                />
-              ))}
+              {KEY_VARIABLES.map((variable) => {
+                const status = variable.getStatus(state);
+                return (
+                  <ProfileRow
+                    key={variable.key}
+                    label={variable.label}
+                    status={status}
+                    value={variable.getValue(state.profile)}
+                  />
+                );
+              })}
             </dl>
 
             <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
