@@ -60,13 +60,88 @@ type PersistedSession = {
   state: ConversationState;
 };
 
+type VariableKey =
+  | "business_segment"
+  | "contract_status"
+  | "contract_expiry_months"
+  | "annual_usage_mwh"
+  | "square_footage"
+  | "building_age_years"
+  | "has_current_provider";
+
+type KeyVariable = {
+  key: VariableKey;
+  label: string;
+  getValue: (profile: LeadProfile) => string;
+  isMissing: (state: ConversationState) => boolean;
+};
+
 const SESSION_STORAGE_KEY = "owe-ui-session";
+const KEY_VARIABLES: KeyVariable[] = [
+  {
+    key: "business_segment",
+    label: "Business type",
+    getValue: (profile) => labelize(profile.business_segment),
+    isMissing: (state) => state.missing_fields.includes("business_segment"),
+  },
+  {
+    key: "contract_status",
+    label: "Contract status",
+    getValue: (profile) => labelize(profile.contract_status),
+    isMissing: (state) => state.missing_fields.includes("contract_status"),
+  },
+  {
+    key: "contract_expiry_months",
+    label: "Contract expiry",
+    getValue: (profile) =>
+      profile.contract_expiry_months !== null
+        ? `${profile.contract_expiry_months} months`
+        : "Not captured",
+    isMissing: (state) => state.missing_fields.includes("contract_expiry_months"),
+  },
+  {
+    key: "annual_usage_mwh",
+    label: "Annual usage",
+    getValue: (profile) =>
+      profile.annual_usage_mwh !== null ? `${profile.annual_usage_mwh} MWh` : "Not captured",
+    isMissing: (state) => state.missing_fields.includes("annual_usage_or_square_footage"),
+  },
+  {
+    key: "square_footage",
+    label: "Building size",
+    getValue: (profile) =>
+      profile.square_footage !== null
+        ? `${profile.square_footage.toLocaleString()} sq ft`
+        : "Not captured",
+    isMissing: (state) => state.missing_fields.includes("annual_usage_or_square_footage"),
+  },
+  {
+    key: "building_age_years",
+    label: "Building age",
+    getValue: (profile) =>
+      profile.building_age_years !== null ? `${profile.building_age_years} years` : "Not captured",
+    isMissing: (state) => state.missing_fields.includes("building_age_years"),
+  },
+  {
+    key: "has_current_provider",
+    label: "Current supplier",
+    getValue: (profile) => {
+      if (profile.has_current_provider === true) return "Yes";
+      if (profile.has_current_provider === false) return "No";
+      return "Not captured";
+    },
+    isMissing: (state) => {
+      if (state.profile.contract_status === "no_current_provider") return false;
+      return state.profile.has_current_provider === null && state.profile.contract_status === "unknown";
+    },
+  },
+];
 
 const initialAssistantMessage: ChatMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "Welcome. Share a few details about your business, contract situation, or energy usage whenever you're ready.",
+    "Hello, I am your business energy intake assistant. I can help collect the account details our team needs for review and follow-up.\n\nTo get started, please share any detail you already know, such as your business type, contract situation, annual usage, current supplier status, or building size.",
 };
 
 const initialState: ConversationState = {
@@ -107,23 +182,34 @@ function formatLanguage(language: string) {
   return language.toUpperCase();
 }
 
-function formatMissingField(field: string) {
-  if (field === "annual_usage_or_square_footage") {
-    return "annual usage or square footage";
-  }
-  return labelize(field);
+function formatTier(tier: Qualification["tier"]) {
+  if (tier === "tier_1") return "Tier 1";
+  if (tier === "tier_2") return "Tier 2";
+  if (tier === "tier_3") return "Tier 3";
+  return "Not qualified yet";
+}
+
+function formatBucket(bucket: Qualification["bucket"]) {
+  if (bucket === "gold") return "Gold";
+  if (bucket === "warm") return "Warm";
+  return "Lemon";
+}
+
+function conclusionTone(tier: Qualification["tier"]) {
+  if (tier === "tier_1") return "border-emerald-300/25 bg-emerald-400/10 text-emerald-100";
+  if (tier === "tier_2") return "border-amber-300/25 bg-amber-400/10 text-amber-100";
+  if (tier === "tier_3") return "border-sky-300/25 bg-sky-400/10 text-sky-100";
+  return "border-white/10 bg-white/5 text-slate-200";
+}
+
+function missingVariableCount(state: ConversationState) {
+  return KEY_VARIABLES.filter((variable) => variable.isMissing(state)).length;
 }
 
 function badgeTone(mode: ConversationMode) {
   return mode === "qualification"
     ? "bg-amber-300/20 text-amber-200 border-amber-200/30"
     : "bg-sky-300/20 text-sky-200 border-sky-200/30";
-}
-
-function bucketTone(bucket: Qualification["bucket"]) {
-  if (bucket === "gold") return "text-amber-200";
-  if (bucket === "warm") return "text-orange-200";
-  return "text-lime-200";
 }
 
 export default function Page() {
@@ -357,7 +443,7 @@ export default function Page() {
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-semibold tracking-tight text-white">
-                Energy lead qualification assistant
+                Business energy intake assistant
               </h1>
               <span
                 className={`rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] ${badgeTone(
@@ -369,7 +455,7 @@ export default function Page() {
             </div>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
               Share a few details about the business, contract situation, and energy usage,
-              and this assistant will help assess the opportunity and its priority.
+              and this assistant will help our team understand your account and follow up.
             </p>
           </div>
 
@@ -413,7 +499,7 @@ export default function Page() {
                   onCompositionEnd={() => setIsComposing(false)}
                   onCompositionStart={() => setIsComposing(true)}
                   onKeyDown={handleComposerKeyDown}
-                  placeholder="Example: We are a commercial site on a month-to-month contract using 80 MWh. Or ask a general question first."
+                  placeholder="Example: We run a hotel on a month-to-month contract using 80 MWh."
                   value={input}
                 />
 
@@ -444,45 +530,70 @@ export default function Page() {
         <aside className="space-y-5">
           <section className="rounded-[24px] border border-white/10 bg-slate-950/70 p-5 shadow-xl shadow-black/20">
             <p className="text-xs uppercase tracking-[0.26em] text-slate-400">
+              System Conclusion
+            </p>
+            <div
+              className={`mt-4 rounded-2xl border p-4 ${conclusionTone(state.qualification.tier)}`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] opacity-75">
+                    Current assessment
+                  </p>
+                  <p className="mt-2 text-2xl font-semibold tracking-tight">
+                    {formatTier(state.qualification.tier)}
+                  </p>
+                </div>
+                <span className="rounded-full border border-current/20 px-3 py-1 text-xs uppercase tracking-[0.2em]">
+                  {formatBucket(state.qualification.bucket)}
+                </span>
+              </div>
+              <p className="mt-4 text-sm leading-6 opacity-90">
+                {state.completed
+                  ? "The intake is complete and this is the current internal outcome based on the captured variables."
+                  : "This is the current internal outcome based on the information captured so far. It may change as more variables are collected."}
+              </p>
+              <p className="mt-3 text-xs leading-5 opacity-70">
+                {state.qualification.reasoning}
+              </p>
+            </div>
+          </section>
+
+          <section className="rounded-[24px] border border-white/10 bg-slate-950/70 p-5 shadow-xl shadow-black/20">
+            <p className="text-xs uppercase tracking-[0.26em] text-slate-400">
               Opportunity Overview
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
               <MetricCard
                 label="Conversation"
-                value={state.mode === "qualification" ? "Assessment in progress" : "General guidance"}
+                value={state.mode === "qualification" ? "Lead intake in progress" : "Lead intake"}
               />
               <MetricCard label="Preferred language" value={formatLanguage(state.detected_language)} />
               <MetricCard
                 label="Status"
-                value={state.completed ? "Assessment complete" : "Gathering details"}
+                value={state.completed ? "Details captured" : "Gathering details"}
+              />
+              <MetricCard
+                label="Key variables"
+                value={`${KEY_VARIABLES.length - missingVariableCount(state)}/${KEY_VARIABLES.length} captured`}
               />
             </div>
           </section>
 
           <section className="rounded-[24px] border border-white/10 bg-slate-950/70 p-5 shadow-xl shadow-black/20">
             <p className="text-xs uppercase tracking-[0.26em] text-slate-400">
-              Qualification
+              Customer Profile
             </p>
             <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm text-slate-400">Current tier</p>
-                  <p className="mt-1 text-2xl font-semibold text-white">
-                    {labelize(state.qualification.tier)}
-                  </p>
-                </div>
-                <div className={`text-sm font-medium uppercase ${bucketTone(state.qualification.bucket)}`}>
-                  {state.qualification.bucket}
-                </div>
-              </div>
-
               <p className="mt-4 text-sm leading-6 text-slate-300">
-                {state.qualification.reasoning}
+                {state.completed
+                  ? "Thanks. We have captured the key details our team needs to review this opportunity."
+                  : "As you answer questions, the captured details will update here for quick review."}
               </p>
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs uppercase tracking-[0.2em] text-slate-300">
-                  {state.completed ? "completed" : "in progress"}
+                  {state.completed ? "details captured" : "in progress"}
                 </span>
                 {state.profile.usage_estimated ? (
                   <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-xs uppercase tracking-[0.2em] text-emerald-200">
@@ -495,83 +606,43 @@ export default function Page() {
 
           <section className="rounded-[24px] border border-white/10 bg-slate-950/70 p-5 shadow-xl shadow-black/20">
             <p className="text-xs uppercase tracking-[0.26em] text-slate-400">
-              Missing Fields
+              7 Key Variables
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {state.missing_fields.length > 0 ? (
-                state.missing_fields.map((field) => (
-                  <span
-                    key={field}
-                    className="rounded-full border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-xs text-amber-100"
-                  >
-                    {formatMissingField(field)}
-                  </span>
-                ))
-              ) : (
-                <span className="text-sm text-slate-400">
-                  Nothing missing right now.
-                </span>
-              )}
-            </div>
+            <dl className="mt-4 grid gap-3 text-sm text-slate-300">
+              {KEY_VARIABLES.map((variable) => (
+                <ProfileRow
+                  key={variable.key}
+                  label={variable.label}
+                  status={variable.isMissing(state) ? "Missing" : "Captured"}
+                  value={variable.getValue(state.profile)}
+                />
+              ))}
+            </dl>
 
             <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                Next question
+                {state.completed ? "Follow-up" : "Next question"}
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-200">
-                {state.next_question}
+                {state.completed
+                  ? "Our team will review the captured details and follow up if there is a fit."
+                  : state.next_question}
               </p>
             </div>
           </section>
 
           <section className="rounded-[24px] border border-white/10 bg-slate-950/70 p-5 shadow-xl shadow-black/20">
             <p className="text-xs uppercase tracking-[0.26em] text-slate-400">
-              Lead Profile
+              Additional Details
             </p>
             <dl className="mt-4 grid gap-3 text-sm text-slate-300">
-              <ProfileRow label="Business segment" value={labelize(state.profile.business_segment)} />
               <ProfileRow
-                label="Annual usage"
-                value={
-                  state.profile.annual_usage_mwh !== null
-                    ? `${state.profile.annual_usage_mwh} MWh`
-                    : "Not captured"
-                }
+                label="Usage estimate source"
+                value={state.profile.usage_estimated ? "Estimated from building size" : "Provided directly"}
               />
               <ProfileRow
-                label="Square footage"
-                value={
-                  state.profile.square_footage !== null
-                    ? `${state.profile.square_footage.toLocaleString()} sq ft`
-                    : "Not captured"
-                }
-              />
-              <ProfileRow label="Contract status" value={labelize(state.profile.contract_status)} />
-              <ProfileRow
-                label="Contract expiry"
-                value={
-                  state.profile.contract_expiry_months !== null
-                    ? `${state.profile.contract_expiry_months} months`
-                    : "Not captured"
-                }
-              />
-              <ProfileRow
-                label="Building age"
-                value={
-                  state.profile.building_age_years !== null
-                    ? `${state.profile.building_age_years} years`
-                    : "Not captured"
-                }
-              />
-              <ProfileRow
-                label="Current provider"
-                value={
-                  state.profile.has_current_provider === null
-                    ? "Not captured"
-                    : state.profile.has_current_provider
-                      ? "Yes"
-                      : "No"
-                }
+                label="Internal notes"
+                value={state.profile.notes.length > 0 ? state.profile.notes.join(", ") : "None"}
               />
             </dl>
           </section>
@@ -590,10 +661,21 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ProfileRow({ label, value }: { label: string; value: string }) {
+function ProfileRow({
+  label,
+  value,
+  status,
+}: {
+  label: string;
+  value: string;
+  status?: string;
+}) {
   return (
     <div className="flex items-start justify-between gap-4 rounded-2xl border border-white/8 bg-white/5 px-3 py-3">
-      <dt className="text-slate-400">{label}</dt>
+      <div>
+        <dt className="text-slate-400">{label}</dt>
+        {status ? <dd className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{status}</dd> : null}
+      </div>
       <dd className="text-right text-slate-100">{value}</dd>
     </div>
   );

@@ -6,9 +6,17 @@ This is the customer-facing chat frontend for the OWE lead qualification assista
 
 ## Runtime
 
-The app expects a backend URL through:
+The app proxies API traffic through Next.js route handlers and supports optional Auth0 session protection.
 
-- `NEXT_PUBLIC_API_BASE_URL`
+Environment variables:
+
+- `INTERNAL_API_BASE_URL`
+- `AUTH0_DOMAIN`
+- `AUTH0_CLIENT_ID`
+- `AUTH0_CLIENT_SECRET`
+- `AUTH0_SECRET`
+- `AUTH0_AUDIENCE`
+- `APP_BASE_URL`
 
 ## Container
 
