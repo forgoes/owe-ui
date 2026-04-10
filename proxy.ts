@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { auth0, isAuthEnabled } from "@/lib/auth0";
 
-export async function proxy(request: Request) {
+export async function proxy(request: NextRequest) {
   if (!isAuthEnabled() || !auth0) {
     return NextResponse.next();
   }
