@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+
+import { AuthHeader } from "@/app/components/auth-header";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -6,7 +9,7 @@ export const metadata: Metadata = {
   description: "Frontend for the Strategic Lead Matrix technical challenge.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -14,6 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <AuthHeader />
         {children}
       </body>
     </html>

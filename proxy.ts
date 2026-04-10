@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { auth0, isAuthEnabled } from "@/lib/auth0";
+import { getAuth0Client } from "@/lib/auth0";
 
 export async function proxy(request: NextRequest) {
-  if (!isAuthEnabled() || !auth0) {
-    return NextResponse.next();
-  }
+  const auth0 = getAuth0Client();
 
   const url = new URL(request.url);
   if (url.pathname.startsWith("/auth")) {

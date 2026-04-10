@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { auth0, isAuthEnabled } from "@/lib/auth0";
+import { getAuth0Client } from "@/lib/auth0";
 
 const DEFAULT_INTERNAL_API_BASE_URL = "http://localhost:8000";
 
@@ -19,27 +19,19 @@ async function handler(
   request: Request,
   context: { params: Promise<{ path?: string[] }> },
 ) {
+  const auth0 = getAuth0Client();
   const { path = [] } = await context.params;
   const upstream = buildUpstreamUrl(request.url, path);
   const headers = new Headers(request.headers);
   headers.delete("host");
 
-  if (isAuthEnabled()) {
-    if (!auth0) {
-      return NextResponse.json(
-        { error: "Auth0 is not configured correctly." },
-        { status: 500 },
-      );
-    }
-
-    const session = await auth0.getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { token } = await auth0.getAccessToken();
-    headers.set("authorization", `Bearer ${token}`);
+  const session = await auth0.getSession();
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const { token } = await auth0.getAccessToken();
+  headers.set("authorization", `Bearer ${token}`);
 
   const upstreamResponse = await fetch(upstream, {
     method: request.method,
